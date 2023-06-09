@@ -1,4 +1,5 @@
 import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { ExpertPotatoService } from 'src/ExpertPotatoService';
 
 interface ExpertPotatoSettings {
 	openAiApiKey?: string;
@@ -9,15 +10,18 @@ const DEFAULT_SETTINGS: ExpertPotatoSettings = {
 
 export default class ExpertPotato extends Plugin {
 	settings: ExpertPotatoSettings;
+	service = new ExpertPotatoService(this.app, this);
 
 	async onload() {
 		await this.loadSettings();
 
 		this.addSettingTab(new ExpertPotatoSettingTab(this.app, this));
+
+		this.service.onload();
 	}
 
 	onunload() {
-
+		this.service.onunload();
 	}
 
 	async loadSettings() {
