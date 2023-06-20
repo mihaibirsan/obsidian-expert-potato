@@ -1,27 +1,75 @@
-import { App, Plugin, TAbstractFile } from "obsidian";
+import { Subject, buffer, debounceTime } from "rxjs";
+import { App, TAbstractFile, request, requestUrl } from "obsidian";
+import ExpertPotato from "main";
+const Multipart = require('multi-part-lite');
+
+// Wait 5s before committing changes to the index
+const DELAY_BEFORE_COMMIT = 5000;
 
 type IndexData = {
     [key: string]: {},
 }
 
+enum ChangeType {
+    UPDATE = "update",
+    DELETE = "delete",
+}
+
+interface Change {
+    path: string;
+    type: ChangeType;
+}
+
 export class ExpertPotatoService {
     private indexedFiles: IndexData = {};
     private indexPath = `${this.app.vault.configDir}/plugins/${this.plugin.manifest.id}/index.json`;
+    private changeTracker$: Subject<Change> = new Subject<Change>();
+    private cumulativeChangesTrigger$ = this.changeTracker$.pipe(
+        debounceTime(DELAY_BEFORE_COMMIT)
+    );
+    private cumulativeChanges$ = this.changeTracker$.pipe(
+        buffer(this.cumulativeChangesTrigger$),
+    ).subscribe((changes: Change[]) => {
+        const changeSet: Record<string, Change> = {};
+        for (const change of changes) {
+            changeSet[change.path] = change;
+        }
+        for (const change of Object.values(changeSet)) {
+            if (change.type === ChangeType.DELETE) {
+                this.fileDelete(change);
+            } else {
+                this.fileUpdate(change);
+            }
+        }
+        return changeSet;
+    });
 
     constructor(
         private app: App,
-        private plugin: Plugin
+        private plugin: ExpertPotato
     ) {}
 
     async onload() {
         await this.loadIndex();
+        await this.auth();
 
         // NOTE: When the app is starting or is being reloaded,
         // a "create" event is fired for every file in the vault
-        this.plugin.registerEvent(this.app.vault.on("create", this.createFile));
-        this.plugin.registerEvent(this.app.vault.on("modify", this.modifyFile));
-        this.plugin.registerEvent(this.app.vault.on("rename", this.renameFile));
-        this.plugin.registerEvent(this.app.vault.on("delete", this.deleteFile));
+        this.plugin.registerEvent(this.app.vault.on("create", ({ path }: TAbstractFile) => {
+            this.changeTracker$.next({ path, type: ChangeType.UPDATE });
+        }));
+        this.plugin.registerEvent(this.app.vault.on("modify", ({ path }: TAbstractFile) => {
+            this.changeTracker$.next({ path, type: ChangeType.UPDATE });
+        }));
+        this.plugin.registerEvent(this.app.vault.on("rename", ({ path }: TAbstractFile, oldPath: string) => {
+            // NOTE: A rename operation is actually a delete and a create, to keep history simple.
+            // this.changeTracker$.next({ path: oldPath, type: ChangeType.RENAME, newPath: path });
+            this.changeTracker$.next({ path: oldPath, type: ChangeType.DELETE });
+            this.changeTracker$.next({ path, type: ChangeType.UPDATE });
+        }));
+        this.plugin.registerEvent(this.app.vault.on("delete", ({ path }: TAbstractFile) => {
+            this.changeTracker$.next({ path, type: ChangeType.DELETE });
+        }));
         // NOTE: The "closed" event doesn't seem to be useful here
     }
 
@@ -29,33 +77,43 @@ export class ExpertPotatoService {
         this.saveIndex();
     }
 
-    createFile = (file: TAbstractFile) => {
-        this.indexedFiles[file.path] = {};
+    fileUpdate = async ({ path }: Change) => {
+        this.indexedFiles[path] = {};
         this.saveIndexDelayed();
-        console.log("createFile", `${file.path}`);
-        // NOTE: Create and Modify are similar, since a file may be copied from a different souce
+
+        if (!path.match(/\.md$/)) {
+            console.log("Skipping non-Markdown file", path);
+            return;
+        }
+
+        const form = new Multipart();
+        form.append("session_id", this.plugin.settings.foundationSessionId!);
+        form.append("files", Buffer.from(await this.app.vault.adapter.read(path)), { filename: path, contentType: "text/markdown" })
+        const body = (await form.buffer()).toString();
+
+        return request({
+            url: `http://${this.plugin.settings.foundationHost}/learn`,
+            method: "POST",
+            contentType: `multipart/form-data; boundary=${form.getBoundary()}`,
+            body,
+        })
     }
 
-    modifyFile = (file: TAbstractFile) => {
-        this.indexedFiles[file.path] = {};
+    fileDelete = ({ path }: Change) => {
+        delete this.indexedFiles[path];
         this.saveIndexDelayed();
-        console.log("modifyFile", `${file.path}`);
-        // NOTE: Defer event handling to the service
-    }
 
-    renameFile = (file: TAbstractFile, oldPath: string) => {
-        this.indexedFiles[file.path] = this.indexedFiles[oldPath];
-        delete this.indexedFiles[oldPath];
-        this.saveIndexDelayed();
-        console.log("renameFile", `${oldPath} -> ${file.path}`);
-        // NOTE: This would ideally only update the metadata of the file;
-        // otherwise, it's a delete and create
-    }
+        const body = new URLSearchParams({
+            "session_id": this.plugin.settings.foundationSessionId!,
+            "filename": path,
+        }).toString()
 
-    deleteFile = (file: TAbstractFile) => {
-        delete this.indexedFiles[file.path];
-        this.saveIndexDelayed();
-        console.log("deleteFile", `${file.path}`);
+        return request({
+            url: `http://${this.plugin.settings.foundationHost}/learn`,
+            method: "DELETE",
+            contentType: "application/x-www-form-urlencoded",
+            body,
+        })
     }
 
     async loadIndex() {
@@ -90,6 +148,24 @@ export class ExpertPotatoService {
         }
         await this.app.vault.adapter.write(this.indexPath, JSON.stringify(this.indexedFiles));
         console.log('Saved index', this.indexedFiles);
+    }
+
+    async auth() {
+        if (!!this.plugin.settings.foundationSessionId) {
+            const response = (await requestUrl({
+                url: `http://${this.plugin.settings.foundationHost}/auth`,
+                method: "POST",
+                body: JSON.stringify({
+                    "openai_key": this.plugin.settings.openAiApiKey,
+                    "source": "OBSIDIAN EXPERT POTATO",
+                })
+            })).json
+
+            this.plugin.settings.foundationSessionId = response.session_id;
+            this.plugin.saveSettings();
+        }
+        
+        return this.plugin.settings.foundationSessionId;
     }
 
     // async search(query) {
