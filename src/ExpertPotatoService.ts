@@ -124,6 +124,22 @@ export class ExpertPotatoService {
         return response
     }
 
+    async search(query: string) {
+        const body = new URLSearchParams({
+            "session_id": this.plugin.settings.foundationSessionId || "N/A",
+            query,
+        }).toString()
+
+        const response = await requestUrl({
+            url: `http://${this.plugin.settings.foundationHost}/search`,
+            method: "POST",
+            contentType: "application/x-www-form-urlencoded",
+            body,
+        }).json
+
+        return response.response.result
+    }
+
     async loadIndex() {
         if (await this.app.vault.adapter.exists(this.indexPath, true)) {
             this.indexedFiles = JSON.parse(await this.app.vault.adapter.read(this.indexPath));
@@ -177,8 +193,4 @@ export class ExpertPotatoService {
         console.log("Session ID", this.plugin.settings.foundationSessionId);
         return this.plugin.settings.foundationSessionId;
     }
-
-    // async search(query) {
-    //     return Array.from(this.indexedFiles).filter(file => file.basename.toLowerCase().includes(query.toLowerCase()));
-    // }
 }

@@ -1,6 +1,7 @@
 import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import { ExpertPotatoService } from 'src/ExpertPotatoService';
 import { SemanticSearchView } from 'src/SemanticSearchView';
+import { plugin } from 'src/stores';
 
 interface ExpertPotatoSettings {
 	openAiApiKey?: string;
@@ -34,6 +35,7 @@ export default class ExpertPotato extends Plugin {
 		}
 
 		this.service.onload();
+		plugin.set(this);
 	}
 
 	addSemanticSearchViewToLeftSidebar() {
@@ -48,6 +50,7 @@ export default class ExpertPotato extends Plugin {
 	onunload() {
 		this.app.workspace.detachLeavesOfType(SemanticSearchView.VIEW_TYPE);
 		this.service.onunload();
+		plugin.set(null);
 	}
 
 	async loadSettings() {
