@@ -1,23 +1,31 @@
 import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { ExpertPotatoService } from 'src/ExpertPotatoService';
 
 interface ExpertPotatoSettings {
 	openAiApiKey?: string;
+	foundationSessionId?: string;
+	foundationHost: string;
 }
 
 const DEFAULT_SETTINGS: ExpertPotatoSettings = {
+	// TODO: Update `foundationHost` prior to release
+	foundationHost: 'localhost:8000'
 }
 
 export default class ExpertPotato extends Plugin {
 	settings: ExpertPotatoSettings;
+	service = new ExpertPotatoService(this.app, this);
 
 	async onload() {
 		await this.loadSettings();
 
 		this.addSettingTab(new ExpertPotatoSettingTab(this.app, this));
+
+		this.service.onload();
 	}
 
 	onunload() {
-
+		this.service.onunload();
 	}
 
 	async loadSettings() {
@@ -58,5 +66,22 @@ class ExpertPotatoSettingTab extends PluginSettingTab {
 					}
 					await this.plugin.saveSettings();
 				}));
+
+		new Setting(containerEl)
+			.setName('Foundation Session ID')
+			.setDesc(document.createRange().createContextualFragment('EVENTUALLY: Find it at <a href="">https://foundation.nimblenexus.com/account/api-keys</a>'))
+			.addText(text => text
+				.setPlaceholder('0a1b...8e9f')
+				.setValue(this.plugin.settings.foundationSessionId || '')
+				.onChange(async (value) => {
+					if (value.length > 0) {
+						this.plugin.settings.foundationSessionId = value;
+					} else {
+						delete this.plugin.settings.foundationSessionId;
+					}
+					await this.plugin.saveSettings();
+				}));
+
+		// NOTE: `foundationHost` is not editable directly by the user, though it may be changed in the settings file
 	}
 }
