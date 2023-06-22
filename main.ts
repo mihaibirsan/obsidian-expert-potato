@@ -71,13 +71,13 @@ class ExpertPotatoSettingTab extends PluginSettingTab {
 			.setName('Foundation Session ID')
 			.setDesc(document.createRange().createContextualFragment('EVENTUALLY: Find it at <a href="">https://foundation.nimblenexus.com/account/api-keys</a>'))
 			.addText(text => text
-				.setPlaceholder('sk-...E0Re')
-				.setValue(this.plugin.settings.openAiApiKey || '')
+				.setPlaceholder('0a1b...8e9f')
+				.setValue(this.plugin.settings.foundationSessionId || '')
 				.onChange(async (value) => {
 					if (value.length > 0) {
-						this.plugin.settings.openAiApiKey = value;
+						this.plugin.settings.foundationSessionId = value;
 					} else {
-						delete this.plugin.settings.openAiApiKey;
+						delete this.plugin.settings.foundationSessionId;
 					}
 					await this.plugin.saveSettings();
 				}));

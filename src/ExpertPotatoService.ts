@@ -1,6 +1,6 @@
 import { Subject, buffer, debounceTime } from "rxjs";
 import { App, TAbstractFile, request, requestUrl } from "obsidian";
-import ExpertPotato from "main";
+import type ExpertPotato from "main";
 const Multipart = require('multi-part-lite');
 
 // Wait 5s before committing changes to the index
@@ -151,7 +151,7 @@ export class ExpertPotatoService {
     }
 
     async auth() {
-        if (!!this.plugin.settings.foundationSessionId) {
+        if (!this.plugin.settings.foundationSessionId) {
             const response = (await requestUrl({
                 url: `http://${this.plugin.settings.foundationHost}/auth`,
                 method: "POST",
