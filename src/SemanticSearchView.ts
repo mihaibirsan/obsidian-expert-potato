@@ -26,6 +26,8 @@ export class SemanticSearchView extends View {
         this.component = new SemanticSearch({
             target: this.containerEl,
             props: {
+                // TODO: Currently using a workaround to pass the plugin instance to the component; check again when Svelte 4 is released
+                // plugin: this.plugin,
                 // TODO: Remember the most recent query
                 // TODO: Cache the most recent results
             }
