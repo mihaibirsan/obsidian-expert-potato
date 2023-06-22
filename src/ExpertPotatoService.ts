@@ -29,16 +29,16 @@ export class ExpertPotatoService {
     );
     private cumulativeChanges$ = this.changeTracker$.pipe(
         buffer(this.cumulativeChangesTrigger$),
-    ).subscribe((changes: Change[]) => {
+    ).subscribe(async (changes: Change[]) => {
         const changeSet: Record<string, Change> = {};
         for (const change of changes) {
             changeSet[change.path] = change;
         }
         for (const change of Object.values(changeSet)) {
             if (change.type === ChangeType.DELETE) {
-                this.fileDelete(change);
+                await this.fileDelete(change);
             } else {
-                this.fileUpdate(change);
+                await this.fileUpdate(change);
             }
         }
         return changeSet;
@@ -86,20 +86,26 @@ export class ExpertPotatoService {
             return;
         }
 
+        console.log("Uploading file", path);
+
         const form = new Multipart();
         form.append("session_id", this.plugin.settings.foundationSessionId!);
         form.append("files", Buffer.from(await this.app.vault.adapter.read(path)), { filename: path, contentType: "text/markdown" })
         const body = (await form.buffer()).toString();
 
-        return request({
+        console.log(body);
+
+        const response = await requestUrl({
             url: `http://${this.plugin.settings.foundationHost}/learn`,
             method: "POST",
             contentType: `multipart/form-data; boundary=${form.getBoundary()}`,
             body,
-        })
+        }).json
+        console.log(response)
+        return response
     }
 
-    fileDelete = ({ path }: Change) => {
+    fileDelete = async ({ path }: Change) => {
         delete this.indexedFiles[path];
         this.saveIndexDelayed();
 
@@ -108,12 +114,14 @@ export class ExpertPotatoService {
             "filename": path,
         }).toString()
 
-        return request({
+        const response = await requestUrl({
             url: `http://${this.plugin.settings.foundationHost}/learn`,
             method: "DELETE",
             contentType: "application/x-www-form-urlencoded",
             body,
-        })
+        }).json
+        console.log(response)
+        return response
     }
 
     async loadIndex() {
@@ -152,6 +160,7 @@ export class ExpertPotatoService {
 
     async auth() {
         if (!this.plugin.settings.foundationSessionId) {
+            console.log("Session ID not found.")
             const response = (await requestUrl({
                 url: `http://${this.plugin.settings.foundationHost}/auth`,
                 method: "POST",
@@ -165,6 +174,7 @@ export class ExpertPotatoService {
             this.plugin.saveSettings();
         }
         
+        console.log("Session ID", this.plugin.settings.foundationSessionId);
         return this.plugin.settings.foundationSessionId;
     }
 
