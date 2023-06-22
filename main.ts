@@ -1,5 +1,7 @@
 import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import { ExpertPotatoService } from 'src/ExpertPotatoService';
+import { SemanticSearchView } from 'src/SemanticSearchView';
+import { plugin } from 'src/stores';
 
 interface ExpertPotatoSettings {
 	openAiApiKey?: string;
@@ -21,11 +23,34 @@ export default class ExpertPotato extends Plugin {
 
 		this.addSettingTab(new ExpertPotatoSettingTab(this.app, this));
 
+		this.registerView(
+			SemanticSearchView.VIEW_TYPE,
+			(leaf) => new SemanticSearchView(leaf)
+		)
+
+		if (this.app.workspace.layoutReady) {
+			this.addSemanticSearchViewToLeftSidebar();
+		} else {
+			this.app.workspace.onLayoutReady(() => this.addSemanticSearchViewToLeftSidebar());
+		}
+
 		this.service.onload();
+		plugin.set(this);
+	}
+
+	addSemanticSearchViewToLeftSidebar() {
+		if (this.app.workspace.getLeavesOfType(SemanticSearchView.VIEW_TYPE).length) {
+			return;
+		}
+		this.app.workspace.getLeftLeaf(false).setViewState({
+			type: SemanticSearchView.VIEW_TYPE,
+		});
 	}
 
 	onunload() {
+		this.app.workspace.detachLeavesOfType(SemanticSearchView.VIEW_TYPE);
 		this.service.onunload();
+		plugin.set(null);
 	}
 
 	async loadSettings() {
