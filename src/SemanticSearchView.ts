@@ -1,4 +1,4 @@
-import { View, WorkspaceLeaf } from 'obsidian';
+import { View } from 'obsidian';
 import SemanticSearch from './SemanticSearch.svelte';
 
 export class SemanticSearchView extends View {
@@ -6,19 +6,15 @@ export class SemanticSearchView extends View {
 
     private component: SemanticSearch;
 
-    constructor(leaf: WorkspaceLeaf) {
-        super(leaf);
-    }
-
-    getViewType(): string {
+    getViewType() {
         return SemanticSearchView.VIEW_TYPE;
     }
 
-    getDisplayText(): string {
+    getDisplayText() {
         return 'Semantic Search';
     }
 
-    getIcon(): string {
+    getIcon() {
         return 'eye';
     }
 

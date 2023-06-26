@@ -1,4 +1,5 @@
 import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { ChatFileView } from 'src/ChatFileView';
 import { ExpertPotatoService } from 'src/ExpertPotatoService';
 import { SemanticSearchView } from 'src/SemanticSearchView';
 import { plugin } from 'src/stores';
@@ -28,11 +29,47 @@ export default class ExpertPotato extends Plugin {
 			(leaf) => new SemanticSearchView(leaf)
 		)
 
+		this.registerView(
+			ChatFileView.VIEW_TYPE,
+			(leaf) => new ChatFileView(leaf)
+		)
+		this.registerExtensions(["chat"], ChatFileView.VIEW_TYPE);
+
 		if (this.app.workspace.layoutReady) {
 			this.addSemanticSearchViewToLeftSidebar();
 		} else {
 			this.app.workspace.onLayoutReady(() => this.addSemanticSearchViewToLeftSidebar());
 		}
+
+		const createNewChatFile = async () => {
+				const newFile = await this.app.vault.create('Untitled.chat', `{
+  "model": "gpt-3.5-turbo",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant."
+    },
+    {
+      "role": "user",
+      "content": "Hello!"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello there, how may I assist you today?"
+    }
+  ]
+}`);
+				await this.app.workspace.openLinkText('', newFile.path, true);
+			}
+
+		this.addCommand({
+			id: 'create-new-chat-file',
+			name: 'Create New Chat File',
+			icon: 'message-square-plus',
+			callback: createNewChatFile,
+		});
+
+		this.addRibbonIcon('message-square-plus', 'Create New Chat File', createNewChatFile);
 
 		this.service.onload();
 		plugin.set(this);

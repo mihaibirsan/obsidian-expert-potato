@@ -6,3 +6,25 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+
+p.chat-message {
+    padding-left: var(--size-4-3)
+}
+
+p.chat-message .chat-role {
+  background-color: var(--background-modifier-hover);
+  border-radius: var(--radius-s);
+  font-size: 9px;
+  font-weight: var(--font-semibold);
+  letter-spacing: 0.05em;
+  line-height: var(--line-height-normal);
+  margin-left: calc(-1 * var(--size-4-3));
+  margin-right: var(--size-2-3);
+  padding: 0 var(--size-4-1);
+  text-transform: uppercase;
+  align-self: center;
+}
+
+p.chat-message.chat-message-role-user {
+    background-color: var(--background-primary-alt);
+}
